@@ -40,6 +40,20 @@ void Renderer::Update(Timer* pTimer)
 void Renderer::Render()
 {
 	//@START
+
+	//Define Triangle in NDC Space
+	std::vector<Vertex> vertices_ndc{};
+	std::vector<Vector2> vertices_screen{};
+	
+	const std::vector<Vertex> vertices_world
+	{
+		{{ 0.0f, 0.5f, 1.f }},
+		{{ 0.5f, -0.5f, 1.f }},
+		{{ -0.5f, -0.5f, 1.f }}
+	};
+	
+	VertexTransformationFunction(vertices_world, vertices_ndc);
+	VertexTransformationToScreenSpace(vertices_ndc, vertices_screen);	
 	//Lock BackBuffer
 	SDL_LockSurface(m_pBackBuffer);
 
@@ -48,12 +62,18 @@ void Renderer::Render()
 	{
 		for (int py{}; py < m_Height; ++py)
 		{
-			float gradient = px / static_cast<float>(m_Width);
-			gradient += py / static_cast<float>(m_Width);
-			gradient /= 2.0f;
+			ColorRGB finalColor{ 0, 0, 0 };
+			
+			const Vector2 curPixel{ static_cast<float>(px), static_cast<float>(py) };
+			const BarycentricWeights weights{ curPixel, vertices_screen };
 
-			ColorRGB finalColor{ gradient, gradient, gradient };
-
+			if(weights.IsPointInsideTriangle())
+			{
+				finalColor = ColorRGB{ 255, 0, 0 } * weights.w0 + ColorRGB{ 0, 255, 0 } * weights.w1 + ColorRGB{ 0, 0, 255 } * weights.w2;
+			}
+			
+			
+			
 			//Update Color in Buffer
 			finalColor.MaxToOne();
 
@@ -71,9 +91,41 @@ void Renderer::Render()
 	SDL_UpdateWindowSurface(m_pWindow);
 }
 
+
+// function that transforms a vector of WORLD space vertices to a vector of
+// NDC space vertices (or directly to SCREEN space).
 void Renderer::VertexTransformationFunction(const std::vector<Vertex>& vertices_in, std::vector<Vertex>& vertices_out) const
 {
 	//Todo > W1 Projection Stage
+	
+	//Convert to NDC > SCREEN space
+	vertices_out.resize(vertices_in.size());
+	for (size_t i{}; i < vertices_in.size(); ++i)
+	{
+		//Transform them with a VIEW Matrix (inverse ONB)
+		vertices_out[i].position = m_Camera.invViewMatrix.TransformPoint({ vertices_in[i].position, 1.0f });
+		vertices_out[i].color = vertices_in[i].color;
+
+		//Apply the Perspective Divide
+		//Divide positions by old z (stored in w)?
+		vertices_out[i].position.x /= vertices_out[i].position.z;
+		vertices_out[i].position.y /= vertices_out[i].position.z;
+		vertices_out[i].position.z /= vertices_out[i].position.z;
+	}
+}
+
+void Renderer::VertexTransformationToScreenSpace(const std::vector<Vertex>& vertices_in,
+	std::vector<Vector2>& vertex_out) const
+{
+
+	vertex_out.reserve(vertices_in.size());
+	for (const Vertex& ndcVertec : vertices_in)
+	{
+		vertex_out.emplace_back(
+			m_Width * ((ndcVertec.position.x + 1) / 2.0f),
+			m_Height * ((1.0f - ndcVertec.position.y) / 2.0f)
+		);
+	}
 }
 
 bool Renderer::SaveBufferToImage() const
