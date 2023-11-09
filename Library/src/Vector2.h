@@ -10,6 +10,8 @@ namespace dae
 		Vector2() = default;
 		Vector2(float _x, float _y);
 		Vector2(const Vector2& from, const Vector2& to);
+		static Vector2 Min(const Vector2& v1, const Vector2& v2);
+		static Vector2 Max(const Vector2& v1, const Vector2& v2);
 
 		float Magnitude() const;
 		float SqrMagnitude() const;
