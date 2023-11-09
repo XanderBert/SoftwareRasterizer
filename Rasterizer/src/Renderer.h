@@ -28,9 +28,11 @@ namespace dae
 		Renderer& operator=(Renderer&&) noexcept = delete;
 
 		void Update(Timer* pTimer);
-		void Render();
+		void Render() const;
 
 		bool SaveBufferToImage() const;
+		void ClearBackground() const;
+		void ResetDepthBuffer() const;
 
 		void VertexTransformationFunction(const std::vector<Vertex>& vertices_in, std::vector<Vertex>& vertices_out) const;
 		void VertexTransformationToScreenSpace(const std::vector<Vertex>& vertices_in, std::vector<Vector2>& vertex_out) const;
@@ -40,7 +42,7 @@ namespace dae
 		SDL_Surface* m_pFrontBuffer{ nullptr };
 		SDL_Surface* m_pBackBuffer{ nullptr };
 		uint32_t* m_pBackBufferPixels{};
-		//float* m_pDepthBufferPixels{};
+		float* m_pDepthBufferPixels{};
 
 		Camera m_Camera{};
 
