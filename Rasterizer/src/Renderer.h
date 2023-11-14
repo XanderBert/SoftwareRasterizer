@@ -29,14 +29,18 @@ namespace dae
 
 		void Update(Timer* pTimer);
 		void Render() const;
-
 		bool SaveBufferToImage() const;
+		
+	private:
 		void ClearBackground() const;
 		void ResetDepthBuffer() const;
 
 		void VertexTransformationFunction(const std::vector<Vertex>& vertices_in, std::vector<Vertex>& vertices_out) const;
 		void VertexTransformationToScreenSpace(const std::vector<Vertex>& vertices_in, std::vector<Vector2>& vertex_out) const;
-	private:
+
+		void RenderTriangle(const Mesh& mesh, const std::vector<Vector2>& verticesScreenSpace,
+		                    const std::vector<Vertex>& verticesNDC, int currentVertexIndex, bool doSwapVertices) const;
+		
 		SDL_Window* m_pWindow{};
 
 		SDL_Surface* m_pFrontBuffer{ nullptr };
@@ -45,8 +49,15 @@ namespace dae
 		float* m_pDepthBufferPixels{};
 
 		Camera m_Camera{};
-
 		int m_Width{};
 		int m_Height{};
+		float m_AspectRatio{};
+
+		//Todo make wrapper class for mesh with a texture and a mesh in it?
+		// Add bool to choose between texture wraping or clamping
+		Texture* m_pTexture{};
+
+
+		std::vector<Mesh> m_MeshesWorld;
 	};
 }

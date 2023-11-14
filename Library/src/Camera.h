@@ -17,6 +17,9 @@ namespace dae
 			fovAngle{_fovAngle}
 		{
 		}
+
+		float nearPlane{ 0.1f };
+		float farPlane{ 1000.f };
 		
 		Vector3 origin{};
 		float fovAngle{90.f};
