@@ -1,10 +1,10 @@
 #pragma once
-#include <cassert>
 #include <SDL_keyboard.h>
 #include <SDL_mouse.h>
 
 #include "Maths.h"
 #include "Timer.h"
+#include "DataTypes.h"
 
 namespace dae
 {
@@ -15,11 +15,9 @@ namespace dae
 		Camera(const Vector3& _origin, float _fovAngle):
 			origin{_origin},
 			fovAngle{_fovAngle}
-		{
-		}
+		{}
 
-		float nearPlane{ 0.1f };
-		float farPlane{ 1000.f };
+		
 		
 		Vector3 origin{};
 		float fovAngle{90.f};
@@ -34,20 +32,37 @@ namespace dae
 
 		Matrix invViewMatrix{};
 		Matrix viewMatrix{};
+		Matrix projectionMatrix{};
 
-		void Initialize(float _fovAngle = 90.f, Vector3 _origin = {0.f,0.f,0.f})
+
+		float nearPlane{ 1.f };
+		float farPlane{ 1000.f };
+
+		
+		void Initialize(float aspectRatio, float _fovAngle = 90.f, Vector3 _origin = {0.f,0.f,0.f})
 		{
 			fovAngle = _fovAngle;
 			fov = tanf((fovAngle * TO_RADIANS) / 2.f);
-
 			origin = _origin;
+
+			CalculateViewMatrix();
+			CalculateProjectionMatrix(aspectRatio);
 		}
 
+
+		static bool IsOutsideFrustum(const Vector4& vector)
+		{			
+			return vector.x < -1.f || vector.x > 1.f
+				|| vector.y < -1.f || vector.y > 1.f
+				|| vector.z < -1.f || vector.z > 1.f;
+		}
+		
 		void CalculateViewMatrix()
 		{
 			//ONB => invViewMatrix
 			//Inverse(ONB) => ViewMatrix
 
+			//TODO -> Calculate ViewMatrix in Matrix class
 			//ViewMatrix => Matrix::CreateLookAtLH(...) [not implemented yet]
 			//DirectX Implementation => https://learn.microsoft.com/en-us/windows/win32/direct3d9/d3dxmatrixlookatlh
 			
@@ -65,11 +80,9 @@ namespace dae
 			viewMatrix = invViewMatrix.Inverse();
 		}
 
-		void CalculateProjectionMatrix()
+		void CalculateProjectionMatrix(const float aspectRatio)
 		{
-			//TODO W3
-
-			//projectionMatrix = Matrix::CreatePerspectiveFovLH(fov,aspectRatio,nearPlane,farPlane);	
+			projectionMatrix = Matrix::CreatePerspectiveFovLH(fov, aspectRatio,nearPlane,farPlane);	
 			//DirectX Implementation => https://learn.microsoft.com/en-us/windows/win32/direct3d9/d3dxmatrixperspectivefovlh
 		}
 
@@ -130,7 +143,7 @@ namespace dae
 
 			//Update Matrices
 			CalculateViewMatrix();
-			CalculateProjectionMatrix(); //Try to optimize this - should only be called once or when fov/aspectRatio changes
+			//CalculateProjectionMatrix(); //Try to optimize this - should only be called once or when fov/aspectRatio changes
 		}
 	};
 }
