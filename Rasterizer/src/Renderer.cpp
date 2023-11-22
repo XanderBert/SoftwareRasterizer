@@ -5,6 +5,9 @@
 
 //Project includes
 #include "Renderer.h"
+
+#include <unordered_set>
+
 #include "Maths.h"
 #include "Texture.h"
 #include "Utils.h"
@@ -27,39 +30,47 @@ Renderer::Renderer(SDL_Window* pWindow) :
 	m_pDepthBufferPixels = new float[static_cast<int>(m_Width * m_Height)];
 
 	//Initialize Camera
-	m_Camera.Initialize(60.f, { .0f,.0f,-10.f });
-	m_AspectRatio = (float)m_Width / (float)m_Height;
+	m_AspectRatio = static_cast<float>(m_Width) / static_cast<float>(m_Height);
+	m_Camera.Initialize(m_AspectRatio,60.f, { .0f,.0f,-10.f });
 
 	//Initialize the texture
-	m_pTexture = Texture::LoadFromFile("Resources/uv_grid_2.png");
+	m_pTexture = Texture::LoadFromFile("Resources/tuktuk.png");
+	
+	
+
+
+
+	std::vector<Vertex> vertices;
+	std::vector<Uint32> indices;
+	Utils::ParseOBJ("Resources/tuktuk.obj", vertices, indices);	
+	m_MeshesWorld.emplace_back(vertices, indices, PrimitiveTopology::TriangleList);
 
 	
 	//Initialize the mesh
 	//Todo: is there an option to optimize the vertices? (remove doubles)
-	m_MeshesWorld.emplace_back(
-		Mesh{
-					{
-						Vertex{{ -3.f, 3.f, -2.f }, { 0.0f, 0.0f }},
-						Vertex{{ 0.f, 3.f, -2.f }, { 0.5f, 0.0f }},
-						Vertex{{ 3.f, 3.f, -2.f }, { 1.0f, 0.0f }},
-						Vertex{{ -3.f, 0.f, -2.f }, { 0.0f, 0.5f }},
-						Vertex{{ 0.f, 0.f, -2.f }, { 0.5f, 0.5f }},
-						Vertex{{ 3.f, 0.f, -2.f }, { 1.0f, 0.5f }},
-						Vertex{{ -3.f, -3.f, -2.f }, { 0.0f, 1.0f }},
-						Vertex{{ 0.f, -3.f, -2.f }, { 0.5f, 1.0f }},
-						Vertex{{ 3.f, -3.f, -2.f }, { 1.0f, 1.0f }},
-					},
-
-		{
-						3,0,4,1,5,2,
-						2,6,
-						6,3,7,4,8,5
-					},
-		
-					PrimitiveTopology::TriangleStrip });
+		m_MeshesWorld.emplace_back(
+			Mesh{
+						{
+							Vertex{{ -3.f, 3.f, -2.f }, { 0.0f, 0.0f }},
+							Vertex{{ 0.f, 3.f, -2.f }, { 0.5f, 0.0f }},
+							Vertex{{ 3.f, 3.f, -2.f }, { 1.0f, 0.0f }},
+							Vertex{{ -3.f, 0.f, -2.f }, { 0.0f, 0.5f }},
+							Vertex{{ 0.f, 0.f, -2.f }, { 0.5f, 0.5f }},
+							Vertex{{ 3.f, 0.f, -2.f }, { 1.0f, 0.5f }},
+							Vertex{{ -3.f, -3.f, -2.f }, { 0.0f, 1.0f }},
+							Vertex{{ 0.f, -3.f, -2.f }, { 0.5f, 1.0f }},
+							Vertex{{ 3.f, -3.f, -2.f }, { 1.0f, 1.0f }},
+						},
+	
+			{
+							3,0,4,1,5,2,
+							2,6,
+							6,3,7,4,8,5
+						},
+			
+						PrimitiveTopology::TriangleStrip });
+	
 }
-
-
 Renderer::~Renderer()
 {
 	delete[] m_pDepthBufferPixels;
@@ -75,8 +86,7 @@ void Renderer::Render() const
 {
 	//@START
 	ClearBackground();
-	ResetDepthBuffer()
-	;
+	ResetDepthBuffer();
 	//Lock BackBuffer
 	SDL_LockSurface(m_pBackBuffer);
 
@@ -84,23 +94,27 @@ void Renderer::Render() const
 	//for each mesh
 	for(const auto& mesh : m_MeshesWorld)
 	{
-		//Define Triangle in NDC Space
-		std::vector<Vertex> vertices_ndc{};
-		std::vector<Vector2> vertices_screen{};
-			
-		VertexTransformationFunction(mesh.vertices, vertices_ndc);
-		VertexTransformationToScreenSpace(vertices_ndc, vertices_screen);
+		//Define Triangle in NDC Space		
+		const auto worldViewProjectionMatrix = mesh.worldMatrix * m_Camera.viewMatrix * m_Camera.projectionMatrix;
+		std::vector<Vertex_Out> vertices_ndc{};
+		VertexTransformationFunction(mesh.vertices, vertices_ndc, worldViewProjectionMatrix, mesh.worldMatrix);
 
-		//Frustum Culling
-		const auto distance = (mesh.worldMatrix.GetTranslation() - m_Camera.origin).SqrMagnitude();
-		if (distance <= m_Camera.nearPlane || distance >= m_Camera.farPlane) continue;
 
+		//Frustum culling should happen here to be more performant
+
+				
 		
+		
+		std::vector<Vector2> vertices_screen{};
+		VertexTransformationToScreenSpace(vertices_ndc, vertices_screen);
+		
+
 		// For each triangle
-		const int meshIndicesSize = static_cast<int>(mesh.indices.size());
-		for (int curStartVertexIdx{}; curStartVertexIdx < meshIndicesSize - 2; ++curStartVertexIdx)
+		for(mesh.m_pTriangleIterator->ResetIndex(); mesh.m_pTriangleIterator->HasNext();)
 		{
-			RenderTriangle(mesh, vertices_screen, vertices_ndc, curStartVertexIdx, curStartVertexIdx % 2);
+			const std::vector<uint32_t> triangleIndices = mesh.m_pTriangleIterator->Next();
+			
+			RenderTriangle(vertices_screen, vertices_ndc, triangleIndices);
 		}
 	}
 
@@ -115,37 +129,37 @@ void Renderer::Render() const
 
 // function that transforms a vector of WORLD space vertices to a vector of
 // NDC space vertices.
-void Renderer::VertexTransformationFunction(const std::vector<Vertex>& vertices_in, std::vector<Vertex>& vertices_out) const
+void Renderer::VertexTransformationFunction(const std::vector<Vertex>& vertices_in, std::vector<Vertex_Out>& vertices_out, const Matrix& worldViewProjectionMatrix, const Matrix& meshWorldMatrix)
 {
 	vertices_out.resize(vertices_in.size());
 
-	// Precompute reciprocal values
-	const float invAspectRatioFov = 1.0f / (m_AspectRatio * m_Camera.fov);
-	const float invFov = 1.0f / m_Camera.fov;
-
 	for (size_t i{}; i < vertices_in.size(); ++i)
-	{
+	{		
 		// Transform with VIEW matrix (inverse ONB)
-		vertices_out[i].position = m_Camera.invViewMatrix.TransformPoint(vertices_in[i].position);
+		vertices_out[i].position = worldViewProjectionMatrix.TransformPoint({vertices_in[i].position, 1.0f});
+		vertices_out[i].normal = meshWorldMatrix.TransformVector(vertices_in[i].normal);
+		vertices_out[i].tangent = meshWorldMatrix.TransformVector(vertices_in[i].tangent);
 
-		// Apply Perspective Divide
-		const float invZ = 1.0f / vertices_out[i].position.z;
+		vertices_out[i].uv = vertices_in[i].uv;
 		
-		vertices_out[i].position.x *= invAspectRatioFov * invZ;
-		vertices_out[i].position.y *= invFov * invZ;
+		// Apply Perspective Divide
+		vertices_out[i].position.x /= vertices_out[i].position.w;
+		vertices_out[i].position.y /= vertices_out[i].position.w;
+		vertices_out[i].position.z /= vertices_out[i].position.w;		
+		//vertices_out[i].uv /= vertices_out[i].position.w;	
 	}
 }
 
-void Renderer::VertexTransformationToScreenSpace(const std::vector<Vertex>& vertices_in,
+void Renderer::VertexTransformationToScreenSpace(const std::vector<Vertex_Out>& vertices_in,
 	std::vector<Vector2>& vertex_out) const
 {
 
 	vertex_out.reserve(vertices_in.size());
 	
 	const float fWidth{ static_cast<float>(m_Width) };
-	const float fHeight{ static_cast<float>(m_Height) };
+		const float fHeight{ static_cast<float>(m_Height) };
 	
-	for (const Vertex& ndcVertex : vertices_in)
+	for (const Vertex_Out& ndcVertex : vertices_in)
 	{
 		vertex_out.emplace_back(
 			fWidth * ((ndcVertex.position.x + 1) / 2.0f),
@@ -154,18 +168,24 @@ void Renderer::VertexTransformationToScreenSpace(const std::vector<Vertex>& vert
 	}
 }
 
-void Renderer::RenderTriangle(const Mesh& mesh, const std::vector<Vector2>& verticesScreenSpace,
-	const std::vector<Vertex>& verticesNDC, int currentVertexIndex, bool doSwapVertices) const
+void Renderer::RenderTriangle(const std::vector<Vector2>& verticesScreenSpace,
+	const std::vector<Vertex_Out>& verticesNDC, const std::vector<uint32_t>& verticesIndexes) const
 {
+	
 	//RENDER LOGIC
 	//Calculate the current vertex index
-	const uint32_t vertexIndex0{ mesh.indices[currentVertexIndex] };
-	const uint32_t vertexIndex1{ mesh.indices[currentVertexIndex + 1 * !doSwapVertices + 2 * doSwapVertices] };
-	const uint32_t vertexIndex2{ mesh.indices[currentVertexIndex + 2 * !doSwapVertices + 1 * doSwapVertices] };
-
-
+	const uint32_t vertexIndex0{ verticesIndexes[0] };
+	const uint32_t vertexIndex1{ verticesIndexes[1] };
+	const uint32_t vertexIndex2{ verticesIndexes[2] };
+	
 	//If A triangle has the same vertex, skip it
 	if (vertexIndex0 == vertexIndex1 || vertexIndex1 == vertexIndex2 || vertexIndex0 == vertexIndex2) return;
+
+	
+	if(Camera::IsOutsideFrustum(verticesNDC[vertexIndex0].position)) return;
+	if(Camera::IsOutsideFrustum(verticesNDC[vertexIndex1].position)) return;
+	if(Camera::IsOutsideFrustum(verticesNDC[vertexIndex2].position)) return;
+
 
 	
 	// Get all the current vertices
@@ -229,9 +249,9 @@ void Renderer::RenderTriangle(const Mesh& mesh, const std::vector<Vector2>& vert
 
 
 			//Calculate the depth
-			const float depthV0{ (verticesNDC[vertexIndex0].position.z) };
-			const float depthV1{ (verticesNDC[vertexIndex1].position.z) };
-			const float depthV2{ (verticesNDC[vertexIndex2].position.z) };
+			const float depthV0{ (verticesNDC[vertexIndex0].position.w) };
+			const float depthV1{ (verticesNDC[vertexIndex1].position.w) };
+			const float depthV2{ (verticesNDC[vertexIndex2].position.w) };
 
 			// Calculate the depth at this pixel
 			const float interpolatedDepth
@@ -252,9 +272,9 @@ void Renderer::RenderTriangle(const Mesh& mesh, const std::vector<Vector2>& vert
 			//Calculate the UV
 			Vector2 curPixelUV
 			{
-				(weightV0 * mesh.vertices[vertexIndex0].uv / depthV0 +
-				weightV1 * mesh.vertices[vertexIndex1].uv / depthV1 +
-				weightV2 * mesh.vertices[vertexIndex2].uv / depthV2) * interpolatedDepth
+				(weightV0 * verticesNDC[vertexIndex0].uv / depthV0 +
+				weightV1 * verticesNDC[vertexIndex1].uv / depthV1 +
+				weightV2 * verticesNDC[vertexIndex2].uv / depthV2) * interpolatedDepth
 			};
 
 

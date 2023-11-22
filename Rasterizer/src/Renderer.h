@@ -13,6 +13,7 @@ namespace dae
 	class Texture;
 	struct Mesh;
 	struct Vertex;
+	struct Vertex_Out;
 	class Timer;
 	class Scene;
 
@@ -35,11 +36,10 @@ namespace dae
 		void ClearBackground() const;
 		void ResetDepthBuffer() const;
 
-		void VertexTransformationFunction(const std::vector<Vertex>& vertices_in, std::vector<Vertex>& vertices_out) const;
-		void VertexTransformationToScreenSpace(const std::vector<Vertex>& vertices_in, std::vector<Vector2>& vertex_out) const;
-
-		void RenderTriangle(const Mesh& mesh, const std::vector<Vector2>& verticesScreenSpace,
-		                    const std::vector<Vertex>& verticesNDC, int currentVertexIndex, bool doSwapVertices) const;
+		static void VertexTransformationFunction(const std::vector<Vertex>& vertices_in, std::vector<Vertex_Out>& vertices_out, const Matrix& worldViewProjectionMatrix, const Matrix& meshWorldMatrix);
+		void VertexTransformationToScreenSpace(const std::vector<Vertex_Out>& vertices_in, std::vector<Vector2>& vertex_out) const;
+		
+		void RenderTriangle(const std::vector<Vector2>& verticesScreenSpace, const std::vector<Vertex_Out>& verticesNDC, const std::vector<uint32_t>& verticesIndexes) const;
 		
 		SDL_Window* m_pWindow{};
 
