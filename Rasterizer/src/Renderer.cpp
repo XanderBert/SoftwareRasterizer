@@ -5,9 +5,6 @@
 
 //Project includes
 #include "Renderer.h"
-
-#include <unordered_set>
-
 #include "Maths.h"
 #include "Texture.h"
 #include "Utils.h"
@@ -37,9 +34,6 @@ Renderer::Renderer(SDL_Window* pWindow) :
 	m_pTexture = Texture::LoadFromFile("Resources/tuktuk.png");
 	
 	
-
-
-
 	std::vector<Vertex> vertices;
 	std::vector<Uint32> indices;
 	Utils::ParseOBJ("Resources/tuktuk.obj", vertices, indices);	
@@ -100,20 +94,17 @@ void Renderer::Render() const
 		VertexTransformationFunction(mesh.vertices, vertices_ndc, worldViewProjectionMatrix, mesh.worldMatrix);
 
 
-		//Frustum culling should happen here to be more performant
+		//TODO Frustum culling and clipping should happen here to be more performant
 
-				
-		
+
 		
 		std::vector<Vector2> vertices_screen{};
 		VertexTransformationToScreenSpace(vertices_ndc, vertices_screen);
 		
-
 		// For each triangle
 		for(mesh.m_pTriangleIterator->ResetIndex(); mesh.m_pTriangleIterator->HasNext();)
 		{
 			const std::vector<uint32_t> triangleIndices = mesh.m_pTriangleIterator->Next();
-			
 			RenderTriangle(vertices_screen, vertices_ndc, triangleIndices);
 		}
 	}
@@ -171,7 +162,6 @@ void Renderer::VertexTransformationToScreenSpace(const std::vector<Vertex_Out>& 
 void Renderer::RenderTriangle(const std::vector<Vector2>& verticesScreenSpace,
 	const std::vector<Vertex_Out>& verticesNDC, const std::vector<uint32_t>& verticesIndexes) const
 {
-	
 	//RENDER LOGIC
 	//Calculate the current vertex index
 	const uint32_t vertexIndex0{ verticesIndexes[0] };
@@ -185,7 +175,6 @@ void Renderer::RenderTriangle(const std::vector<Vector2>& verticesScreenSpace,
 	if(Camera::IsOutsideFrustum(verticesNDC[vertexIndex0].position)) return;
 	if(Camera::IsOutsideFrustum(verticesNDC[vertexIndex1].position)) return;
 	if(Camera::IsOutsideFrustum(verticesNDC[vertexIndex2].position)) return;
-
 
 	
 	// Get all the current vertices
@@ -214,8 +203,8 @@ void Renderer::RenderTriangle(const std::vector<Vector2>& verticesScreenSpace,
 	const int endX{ std::clamp(static_cast<int>(maxBoundingBox.x + margin), 0, m_Width) };
 	const int endY{ std::clamp(static_cast<int>(maxBoundingBox.y + margin), 0, m_Height) };
 
-		
-		
+
+	
 	// For each pixel
 	for (int px{startX}; px < endX; ++px)
 	{
@@ -247,11 +236,11 @@ void Renderer::RenderTriangle(const std::vector<Vector2>& verticesScreenSpace,
 			const float weightV1{ edge20PointCross / fullTriangleArea };
 			const float weightV2{ edge01PointCross / fullTriangleArea };
 
-
+//-------------------------------------------------------------------------------
 			//Calculate the depth
-			const float depthV0{ (verticesNDC[vertexIndex0].position.w) };
-			const float depthV1{ (verticesNDC[vertexIndex1].position.w) };
-			const float depthV2{ (verticesNDC[vertexIndex2].position.w) };
+			const float depthV0{ (verticesNDC[vertexIndex0].position.z) };
+			const float depthV1{ (verticesNDC[vertexIndex1].position.z) };
+			const float depthV2{ (verticesNDC[vertexIndex2].position.z) };
 
 			// Calculate the depth at this pixel
 			const float interpolatedDepth
@@ -268,13 +257,29 @@ void Renderer::RenderTriangle(const std::vector<Vector2>& verticesScreenSpace,
 			// Save the new depth
 			m_pDepthBufferPixels[pixelIdx] = interpolatedDepth;
 
+//-------------------------------------------------------------------------------
 
+
+			//Calculate the depth
+			const float WdepthV0{ (verticesNDC[vertexIndex0].position.w) };
+			const float WdepthV1{ (verticesNDC[vertexIndex1].position.w) };
+			const float WdepthV2{ (verticesNDC[vertexIndex2].position.w) };
+
+			// Calculate the depth at this pixel
+			const float interpolatedWDepth
+			{
+				1.0f /
+					(weightV0 * 1.0f / WdepthV0 +
+					weightV1 * 1.0f / WdepthV1 +
+					weightV2 * 1.0f / WdepthV2)
+			};
+			
 			//Calculate the UV
 			Vector2 curPixelUV
 			{
-				(weightV0 * verticesNDC[vertexIndex0].uv / depthV0 +
-				weightV1 * verticesNDC[vertexIndex1].uv / depthV1 +
-				weightV2 * verticesNDC[vertexIndex2].uv / depthV2) * interpolatedDepth
+				(weightV0 * verticesNDC[vertexIndex0].uv / WdepthV0 +
+				weightV1 * verticesNDC[vertexIndex1].uv / WdepthV1 +
+				weightV2 * verticesNDC[vertexIndex2].uv / WdepthV2) * interpolatedWDepth
 			};
 
 
