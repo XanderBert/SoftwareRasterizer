@@ -19,8 +19,6 @@ namespace dae
 		{
 			SDL_FreeSurface(m_pSurface);
 			m_pSurface = nullptr;
-
-			//delete[] m_pSurfacePixels;
 		}
 	}
 
@@ -31,6 +29,7 @@ namespace dae
 
 		//Todo implement own assertion library?
 		assert(pSurface != nullptr && IMG_GetError());
+		
 		if(!pSurface) return nullptr;
 
 		
@@ -51,9 +50,9 @@ namespace dae
 		const int textureWidth = m_pSurface->w;
 		const int textureHeight = m_pSurface->h;
 		
-		// Round to the nearest integer for pixel coordinates
-		const int xCord = static_cast<int>(textureWidth * uv.x + 0.5f);
-		const int yCord = static_cast<int>(textureHeight * uv.y + 0.5f);
+		// Round to the nearest integer for pixel coordinates		
+		const int xCord = static_cast<int>(std::lround(static_cast<float>(textureWidth) * uv.x + 0.5f));
+		const int yCord = static_cast<int>(std::lround(static_cast<float>(textureHeight) * uv.y + 0.5f));
 
 		// Get the pixel index
 		const auto surfacePixelIndex = xCord + yCord * textureWidth;
