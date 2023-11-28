@@ -65,8 +65,8 @@ int main(int argc, char* args[])
 				isLooping = false;
 				break;
 			case SDL_KEYUP:
-				if (e.key.keysym.scancode == SDL_SCANCODE_X)
-					takeScreenshot = true;
+				if (e.key.keysym.scancode == SDL_SCANCODE_X) takeScreenshot = true;
+				if (e.key.keysym.scancode == SDL_SCANCODE_F4) pRenderer->ToggleDepthBufferDisplay();
 				break;
 			}
 		}

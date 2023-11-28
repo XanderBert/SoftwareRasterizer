@@ -31,6 +31,8 @@ namespace dae
 		void Update(Timer* pTimer);
 		void Render() const;
 		bool SaveBufferToImage() const;
+
+		void ToggleDepthBufferDisplay() { m_DisplayDepthBuffer = !m_DisplayDepthBuffer; }
 		
 	private:
 		void ClearBackground() const;
@@ -52,6 +54,8 @@ namespace dae
 		int m_Width{};
 		int m_Height{};
 		float m_AspectRatio{};
+
+		bool m_DisplayDepthBuffer{ false };
 
 		//Todo make wrapper class for mesh with a texture and a mesh in it?
 		// Add bool to choose between texture wraping or clamping

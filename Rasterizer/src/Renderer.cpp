@@ -109,6 +109,8 @@ void Renderer::Render() const
 		}
 	}
 
+
+
 	
 	//@END
 	//Update SDL Surface
@@ -273,35 +275,52 @@ void Renderer::RenderTriangle(const std::vector<Vector2>& verticesScreenSpace,
 					weightV1 * 1.0f / WdepthV1 +
 					weightV2 * 1.0f / WdepthV2)
 			};
-			
-			//Calculate the UV
-			Vector2 curPixelUV
+
+
+			if(!m_DisplayDepthBuffer)
 			{
-				(weightV0 * verticesNDC[vertexIndex0].uv / WdepthV0 +
-				weightV1 * verticesNDC[vertexIndex1].uv / WdepthV1 +
-				weightV2 * verticesNDC[vertexIndex2].uv / WdepthV2) * interpolatedWDepth
-			};
+				//Calculate the UV
+				Vector2 curPixelUV
+				{
+					(weightV0 * verticesNDC[vertexIndex0].uv / WdepthV0 +
+					weightV1 * verticesNDC[vertexIndex1].uv / WdepthV1 +
+					weightV2 * verticesNDC[vertexIndex2].uv / WdepthV2) * interpolatedWDepth
+				};
 
 
-			#if TextureTiling
-			// Wrap UV coordinates to the [0, 1] range
-			curPixelUV.x = fmod(curPixelUV.x, 1.0f);
-			curPixelUV.y = fmod(curPixelUV.y, 1.0f);
-			if (curPixelUV.x < 0.0f) curPixelUV.x += 1.0f;
-			if (curPixelUV.y < 0.0f) curPixelUV.y += 1.0f;
+				#if TextureTiling
+				// Wrap UV coordinates to the [0, 1] range
+				curPixelUV.x = fmod(curPixelUV.x, 1.0f);
+				curPixelUV.y = fmod(curPixelUV.y, 1.0f);
+				if (curPixelUV.x < 0.0f) curPixelUV.x += 1.0f;
+				if (curPixelUV.y < 0.0f) curPixelUV.y += 1.0f;
 
-			#else
+				#else
 			
-			// Clamp UV coordinates to the [0, 1] range
-			curPixelUV.x = std::max(0.0f, std::min(1.0f, curPixelUV.x));
-			curPixelUV.y = std::max(0.0f, std::min(1.0f, curPixelUV.y));
-			#endif
+				// Clamp UV coordinates to the [0, 1] range
+				curPixelUV.x = std::max(0.0f, std::min(1.0f, curPixelUV.x));
+				curPixelUV.y = std::max(0.0f, std::min(1.0f, curPixelUV.y));
+				#endif
 
+				//Update Color in Buffer
+				finalColor =  m_pTexture->Sample(curPixelUV);
+			}else
+			{
+				//Display the depth buffer when needed
+				//Remap the interpolated depthColor to a range between 0 and 1
+				// Min and Max values of the original range
+				constexpr float minValue = 1.0;
+				constexpr float maxValue = 34.0;
+
+				// Remap the value to the range [0, 1]
+				const float remappedValue = (interpolatedWDepth - minValue) / (maxValue - minValue);
+				finalColor =  ColorRGB{remappedValue, remappedValue, remappedValue};
+			}
 			
-			//Update Color in Buffer
-			finalColor =  m_pTexture->Sample(curPixelUV);
+			
+			
 			finalColor.MaxToOne();
-
+			
 			m_pBackBufferPixels[px + (py * m_Width)] = SDL_MapRGB(m_pBackBuffer->format,
 				static_cast<uint8_t>(finalColor.r * 255),
 				static_cast<uint8_t>(finalColor.g * 255),
