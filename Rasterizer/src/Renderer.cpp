@@ -239,7 +239,7 @@ void Renderer::RenderTriangle(const std::vector<Vector2>& verticesScreenSpace,
 			const float weightV2{ edge01PointCross / fullTriangleArea };
 
 //-------------------------------------------------------------------------------
-			//Calculate the depth
+			//Calculate the Z depth
 			const float depthV0{ (verticesNDC[vertexIndex0].position.z) };
 			const float depthV1{ (verticesNDC[vertexIndex1].position.z) };
 			const float depthV2{ (verticesNDC[vertexIndex2].position.z) };
@@ -248,9 +248,9 @@ void Renderer::RenderTriangle(const std::vector<Vector2>& verticesScreenSpace,
 			const float interpolatedDepth
 			{
 				1.0f /
-					(weightV0 * 1.0f / depthV0 +
-					weightV1 * 1.0f / depthV1 +
-					weightV2 * 1.0f / depthV2)
+					(weightV0  / depthV0 +
+					weightV1  / depthV1 +
+					weightV2 / depthV2)
 			};
 
 			// If this pixel hit is further away then a previous pixel hit, continue to the next pixel
@@ -262,7 +262,7 @@ void Renderer::RenderTriangle(const std::vector<Vector2>& verticesScreenSpace,
 //-------------------------------------------------------------------------------
 
 
-			//Calculate the depth
+			//Calculate W the depth
 			const float WdepthV0{ (verticesNDC[vertexIndex0].position.w) };
 			const float WdepthV1{ (verticesNDC[vertexIndex1].position.w) };
 			const float WdepthV2{ (verticesNDC[vertexIndex2].position.w) };
@@ -271,9 +271,9 @@ void Renderer::RenderTriangle(const std::vector<Vector2>& verticesScreenSpace,
 			const float interpolatedWDepth
 			{
 				1.0f /
-					(weightV0 * 1.0f / WdepthV0 +
-					weightV1 * 1.0f / WdepthV1 +
-					weightV2 * 1.0f / WdepthV2)
+					(weightV0  / WdepthV0 +
+					weightV1  / WdepthV1 +
+					weightV2 / WdepthV2)
 			};
 
 
@@ -298,8 +298,8 @@ void Renderer::RenderTriangle(const std::vector<Vector2>& verticesScreenSpace,
 				#else
 			
 				// Clamp UV coordinates to the [0, 1] range
-				curPixelUV.x = std::max(0.0f, std::min(1.0f, curPixelUV.x));
-				curPixelUV.y = std::max(0.0f, std::min(1.0f, curPixelUV.y));
+				curPixelUV.x = std::clamp(curPixelUV.x, 0.0f, 1.0f);
+				curPixelUV.y = std::clamp(curPixelUV.y, 0.0f, 1.0f);
 				#endif
 
 				//Update Color in Buffer
@@ -309,11 +309,13 @@ void Renderer::RenderTriangle(const std::vector<Vector2>& verticesScreenSpace,
 				//Display the depth buffer when needed
 				//Remap the interpolated depthColor to a range between 0 and 1
 				// Min and Max values of the original range
-				constexpr float minValue = 1.0;
-				constexpr float maxValue = 34.0;
+				constexpr float minValue = 0.8f;
+				constexpr float maxValue = 1.f;
 
 				// Remap the value to the range [0, 1]
-				const float remappedValue = (interpolatedWDepth - minValue) / (maxValue - minValue);
+				float remappedValue = (interpolatedDepth - minValue) / (maxValue - minValue);
+				remappedValue = std::clamp(remappedValue, 0.f, 1.f);
+				
 				finalColor =  ColorRGB{remappedValue, remappedValue, remappedValue};
 			}
 			
