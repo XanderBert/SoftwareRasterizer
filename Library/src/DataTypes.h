@@ -23,7 +23,7 @@ namespace dae
 		Vector2 uv{};
 		Vector3 normal{};
 		Vector3 tangent{};
-		//Vector3 viewDirection{};
+		Vector3 viewDirection{};
 	};
 
 
@@ -55,6 +55,13 @@ namespace dae
 			{
 				m_pTriangleIterator = std::make_unique<TriangleStripIterator>((this->indices));
 			}
+		}
+
+
+
+		void Rotate(float angle, const Vector3& axis)
+		{
+			worldMatrix = Matrix::CreateRotation(axis * angle) * worldMatrix;				
 		}
 		
 		std::vector<Vertex> vertices{};
