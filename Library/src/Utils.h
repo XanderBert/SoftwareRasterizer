@@ -12,7 +12,7 @@ namespace dae
 		//Just parses vertices and indices
 #pragma warning(push)
 #pragma warning(disable : 4505) //Warning unreferenced local function
-		static bool ParseOBJ(const std::string& filename, std::vector<Vertex>& vertices, std::vector<uint32_t>& indices, bool flipAxisAndWinding = true)
+		static bool ParseOBJ(const std::string& filename, std::vector<Vertex>& vertices, bool flipAxisAndWinding = true)
 		{
 #ifdef DISABLE_OBJ
 			assert(false && "OBJ PARSER not enabled! Check the comments in Utils::ParseOBJ");
@@ -27,6 +27,8 @@ namespace dae
 			std::vector<Vector2> UVs{};
 
 			vertices.clear();
+			
+			std::vector<uint32_t> indices{};
 			indices.clear();
 
 			std::string sCommand;

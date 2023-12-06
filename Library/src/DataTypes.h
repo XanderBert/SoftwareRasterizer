@@ -42,35 +42,22 @@ namespace dae
 	struct Mesh
 	{
 
-		Mesh(const  std::vector<Vertex>& vertices, const std::vector<uint32_t>& indices, PrimitiveTopology primitiveTopology = PrimitiveTopology::TriangleList) :
+		Mesh(const  std::vector<Vertex>& vertices, PrimitiveTopology primitiveTopology = PrimitiveTopology::TriangleList) :
 			vertices{ (vertices) },
-			indices{ (indices) },
 			primitiveTopology{ primitiveTopology }
-		{
-			if(primitiveTopology == PrimitiveTopology::TriangleList)
-			{
-				m_pTriangleIterator = std::make_unique<TriangleListIterator>((this->indices));
-			}
-			else if(primitiveTopology == PrimitiveTopology::TriangleStrip)
-			{
-				m_pTriangleIterator = std::make_unique<TriangleStripIterator>((this->indices));
-			}
-		}
+		{}
 
-
-
+		
 		void Rotate(float angle, const Vector3& axis)
 		{
 			worldMatrix = Matrix::CreateRotation(axis * angle) * worldMatrix;				
 		}
 		
 		std::vector<Vertex> vertices{};
-		std::vector<uint32_t> indices{};
+
 		PrimitiveTopology primitiveTopology{ PrimitiveTopology::TriangleStrip };
 
 		std::vector<Vertex_Out> vertices_out{};
 		Matrix worldMatrix{};
-
-		std::unique_ptr<ITriangleIndicesIterator> m_pTriangleIterator{};
 	};
 }

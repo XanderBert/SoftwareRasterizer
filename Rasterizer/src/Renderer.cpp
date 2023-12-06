@@ -10,7 +10,7 @@
 #include "Utils.h"
 
 #define TextureTiling 0
-#define Clipping 0
+
 
 
 
@@ -41,9 +41,8 @@ Renderer::Renderer(SDL_Window* pWindow) :
 	
 	//Load the model
 	std::vector<Vertex> vertices;
-	std::vector<Uint32> indices;
-	Utils::ParseOBJ("Resources/vehicle.obj", vertices, indices);	
-	m_MeshesWorld.emplace_back(vertices, indices, PrimitiveTopology::TriangleList);	
+	Utils::ParseOBJ("Resources/vehicle.obj", vertices);	
+	m_MeshesWorld.emplace_back(vertices, PrimitiveTopology::TriangleList);	
 }
 Renderer::~Renderer()
 {
@@ -81,19 +80,16 @@ void Renderer::Render()
 		VertexTransformationFunction(mesh.vertices, vertices_ndc, worldViewProjectionMatrix, mesh.worldMatrix);
 
 
-		std::vector<Vertex_Out> clippedVertices_ndc =  vertices_ndc;//SutherlandHodgmanClipping(vertices_ndc);
+		std::vector<Vertex_Out> clippedVertices_ndc = SutherlandHodgmanClipping(vertices_ndc);
 
 		
 		std::vector<Vector2> vertices_screen{};
 		VertexTransformationToScreenSpace(clippedVertices_ndc, vertices_screen);
 		
-		
-		// For each triangle
-		for(mesh.m_pTriangleIterator->ResetIndex(); mesh.m_pTriangleIterator->HasNext();)
+
+		for(uint32_t vertex{}; vertex < clippedVertices_ndc.size(); vertex += 3)
 		{
-			
-			const std::vector<uint32_t> triangleIndices = mesh.m_pTriangleIterator->Next();
-			RenderTriangle(vertices_screen, clippedVertices_ndc, triangleIndices);
+			RenderTriangle(vertices_screen, clippedVertices_ndc, {vertex, vertex + 2, vertex + 1});
 		}
 	}
 	
@@ -160,120 +156,14 @@ void Renderer::RenderTriangle(const std::vector<Vector2>& verticesScreenSpace,
 	//RENDER LOGIC
 	//Calculate the current vertex index
 	//Get index of last vertex,
-	// +2
-	// -1
-	// +2
-	
+
 	const uint32_t vertexIndex0{ verticesIndexes[0] };
 	const uint32_t vertexIndex1{ verticesIndexes[1] };
 	const uint32_t vertexIndex2{ verticesIndexes[2] };
 	
 	//If A triangle has the same vertex, skip it
 	if (vertexIndex0 == vertexIndex1 || vertexIndex1 == vertexIndex2 || vertexIndex0 == vertexIndex2) return;
-
-
-	
-#if Clipping
-	//Should i resize the vector to 3?
-	std::vector<uint32_t> verticesOutOfFrustum{};
-	if(Camera::IsOutsideFrustum(verticesNDC[vertexIndex0].position))
-	{
-		verticesOutOfFrustum.emplace_back(0);
-	}
-	if(Camera::IsOutsideFrustum(verticesNDC[vertexIndex1].position))
-	{
-		verticesOutOfFrustum.push_back(1);
-	}
-	if(Camera::IsOutsideFrustum(verticesNDC[vertexIndex2].position))
-	{
-		verticesOutOfFrustum.push_back(2);
-	}
-
-	if(verticesOutOfFrustum.size() == 3) return;
-
-	
-	//1. 2 Vertices are outside the frustum
-	//We Should Add 2 new vertices to the triangle where the line gets clipped off, and render it as 1 new triangle
-	if(verticesOutOfFrustum.size() == 2)
-	{
-		return;
-	}
-
-	//2. Only 1 Vertex is outside the frustum
-	//We should add 2 new vertices to the triangle where the line gets clipped off,  and render it as 2 triangles
-	if(verticesOutOfFrustum.size() == 1)
-	{
 		
-
-		
-		const auto index0 = verticesIndexes[verticesOutOfFrustum[0]];
-		Vertex_Out vertexOutOfFrustum =  verticesNDC[index0];
-    
-		const auto index1 = verticesIndexes[((verticesOutOfFrustum[0] + 1) % 3)];
-		const auto index2 =verticesIndexes[(verticesOutOfFrustum[0] + 2) % 3];
-		Vertex_Out vertexInsideFrustum1 = verticesNDC[index1];
-		Vertex_Out vertexInsideFrustum2 = verticesNDC[index2];
-
-		Vector4 dir1 = vertexInsideFrustum1.position - vertexOutOfFrustum.position;
-		Vector4 dir2 = vertexInsideFrustum2.position - vertexOutOfFrustum.position;
-
-		// Calculate t for each axis and direction
-		float t1[6], t2[6];
-		for(int i = 0; i < 3; ++i)
-		{
-			t1[i*2] = (-1.0f - vertexOutOfFrustum.position[i]) / dir1[i]; // min
-			t1[i*2+1] = (1.0f - vertexOutOfFrustum.position[i]) / dir1[i]; // max
-			t2[i*2] = (-1.0f - vertexOutOfFrustum.position[i]) / dir2[i]; // min
-			t2[i*2+1] = (1.0f - vertexOutOfFrustum.position[i]) / dir2[i]; // max
-		}
-
-		// Find valid t values that are within the range [0, 1]
-		std::vector<float> validT1, validT2;
-		for(int i = 0; i < 6; ++i)
-		{
-			if(t1[i] >= 0.0f && t1[i] <= 1.0f) validT1.push_back(t1[i]);
-			if(t2[i] >= 0.0f && t2[i] <= 1.0f) validT2.push_back(t2[i]);
-		}
-
-		// Calculate the intersection points
-		Vector4 intersectionPoint1 = vertexOutOfFrustum.position + dir1 * (*std::ranges::min_element(validT1));
-		Vector4 intersectionPoint2 = vertexOutOfFrustum.position + dir2 * (*std::ranges::min_element(validT2));
-
-		// Replace the vertex outside the frustum with the intersection point
-		vertexOutOfFrustum.position = intersectionPoint1;
-
-		// Create a new vertex with the second intersection point
-		// Vertex_Out newVertex;
-		//
-		// newVertex.position = intersectionPoint2;
-		// newVertex.normal = -vertexOutOfFrustum.normal;
-		// newVertex.uv = vertexOutOfFrustum.uv;
-		// newVertex.tangent = vertexOutOfFrustum.tangent;
-
-		
-		//verticesNDC.push_back(newVertex);
-		// verticesNDC.push_back(vertexInsideFrustum1);
-		// verticesNDC.push_back(vertexInsideFrustum2);
-		//
-		//
-		// std::vector<Vector2> extraVerticesScreenSpace{};
-		// VertexTransformationToScreenSpace({newVertex, vertexInsideFrustum1, vertexInsideFrustum2}, extraVerticesScreenSpace);
-		//
-		// verticesScreenSpace.push_back(extraVerticesScreenSpace[0]);
-		// verticesScreenSpace.push_back(extraVerticesScreenSpace[1]);
-		// verticesScreenSpace.push_back(extraVerticesScreenSpace[2]);
-		//AND THIS WILL ONLY WORK WHEN ITS NOT A TRIANGLSTRIPPPPPPPPPPPPPP
-		
-	}
-
-	
-#else
-	//If a vertex is out of the frustum, don't render the triangle.
-	if(Camera::IsOutsideFrustum(verticesNDC[vertexIndex0].position)) return;
-	if(Camera::IsOutsideFrustum(verticesNDC[vertexIndex1].position))  return;
-	if(Camera::IsOutsideFrustum(verticesNDC[vertexIndex2].position))  return;
-#endif
-	
 	// Get all the current vertices
 	const Vector2 v0{ verticesScreenSpace[vertexIndex0] };
 	const Vector2 v1{ verticesScreenSpace[vertexIndex1] };
@@ -618,12 +508,29 @@ std::vector<Vertex_Out> Renderer::SutherlandHodgmanClipping(const std::vector<Ve
 	std::vector<Vertex_Out> outputVertices;
 	outputVertices.reserve(inputVertices.size());
 	
-	for(const auto& vertex : inputVertices)
+	for(uint32_t vertex{}; vertex < inputVertices.size(); vertex += 3)
 	{
-		if(Camera::IsOutsideFrustum(vertex.position)) continue;
-		outputVertices.push_back(vertex);
-	}
+		std::vector<uint32_t> index =  {vertex, vertex + 1, vertex + 2};
+
+		bool isOneOutofFrustum = false;
+		for(const auto vertexIndex : index)
+		{
+			if(Camera::IsOutsideFrustum(inputVertices[vertexIndex].position))
+			{
+				isOneOutofFrustum = true;
+				break;
+			}
+		}
 		
+		if(!isOneOutofFrustum)
+		{
+			outputVertices.push_back(inputVertices[index[0]]);
+			outputVertices.push_back(inputVertices[index[1]]);
+			outputVertices.push_back(inputVertices[index[2]]);
+		}
+	}
+
+			
 	outputVertices.shrink_to_fit();
 	return outputVertices;
 }
